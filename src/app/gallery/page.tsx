@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Container, Typography, Box, Divider, Grid, Card, CardContent, CardMedia, Select, MenuItem, FormControl, InputLabel, Pagination, Stack } from '@mui/material';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Container, Typography, Box, Divider, Grid, Card, CardContent, CardMedia, Select, MenuItem, FormControl, InputLabel, Pagination, Stack, Modal, IconButton } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
 const sampleCategories = [
   { id: 0, name: '전체' },
@@ -15,7 +18,7 @@ const sampleCategories = [
 
 const samplePhotos = Array.from({ length: 23 }).map((_, i) => ({
   id: i + 1,
-  url: `https://picsum.photos/seed/${i + 1}/400/300`,
+  url: `https://picsum.photos/seed/${i + 1}/800/600`,
   date: `2025-04-${(i % 28 + 1).toString().padStart(2, '0')}`,
   location: '서울',
   categoryId: (i % 6) + 1,
@@ -26,10 +29,34 @@ const PHOTOS_PER_PAGE = 20;
 export default function GalleryPage() {
   const [category, setCategory] = useState(0);
   const [page, setPage] = useState(1);
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   const filtered = category === 0 ? samplePhotos : samplePhotos.filter(p => p.categoryId === category);
   const paged = filtered.slice((page - 1) * PHOTOS_PER_PAGE, page * PHOTOS_PER_PAGE);
   const pageCount = Math.ceil(filtered.length / PHOTOS_PER_PAGE);
+
+  // 확장 보기 모달 내비게이션
+  const handlePrev = useCallback(() => {
+    if (expandedIdx === null) return;
+    setExpandedIdx(idx => (idx! - 1 + paged.length) % paged.length);
+  }, [expandedIdx, paged.length]);
+
+  const handleNext = useCallback(() => {
+    if (expandedIdx === null) return;
+    setExpandedIdx(idx => (idx! + 1) % paged.length);
+  }, [expandedIdx, paged.length]);
+
+  // 키보드 지원
+  useEffect(() => {
+    if (expandedIdx === null) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') handlePrev();
+      if (e.key === 'ArrowRight') handleNext();
+      if (e.key === 'Escape') setExpandedIdx(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [expandedIdx, handlePrev, handleNext]);
 
   return (
     <Container maxWidth="lg">
@@ -54,7 +81,7 @@ export default function GalleryPage() {
           <Select
             value={category}
             label="카테고리"
-            onChange={e => { setCategory(Number(e.target.value)); setPage(1); }}
+            onChange={e => { setCategory(Number(e.target.value)); setPage(1); setExpandedIdx(null); }}
           >
             {sampleCategories.map(cat => (
               <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
@@ -63,21 +90,31 @@ export default function GalleryPage() {
         </FormControl>
       </Box>
       <Grid container spacing={2} columns={{ xs: 2, sm: 4, md: 5 }}>
-        {paged.map(photo => (
+        {paged.map((photo, idx) => (
           <Grid item xs={1} sm={1} md={1} key={photo.id}>
-            <Card sx={{ borderRadius: 2, overflow: 'hidden', height: '100%' }}>
+            <Card sx={{ borderRadius: 2, overflow: 'hidden', height: '100%', position: 'relative', cursor: 'pointer' }} onClick={() => setExpandedIdx(idx)}>
               <CardMedia
                 component="img"
                 height="140"
                 image={photo.url}
                 alt="gallery"
-                sx={{ objectFit: 'cover', aspectRatio: '4/3' }}
+                sx={{ objectFit: 'cover', aspectRatio: '4/3', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.03)' } }}
               />
-              <CardContent sx={{ p: 1 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {photo.date} | {photo.location}
-                </Typography>
-              </CardContent>
+              {/* 메타데이터 오버레이 */}
+              <Box sx={{
+                position: 'absolute',
+                left: 0,
+                bottom: 0,
+                width: '100%',
+                bgcolor: 'rgba(0,0,0,0.5)',
+                color: '#fff',
+                px: 1,
+                py: 0.5,
+                fontSize: 12,
+                letterSpacing: 0.5,
+              }}>
+                {photo.date} | {photo.location}
+              </Box>
             </Card>
           </Grid>
         ))}
@@ -86,11 +123,47 @@ export default function GalleryPage() {
         <Pagination
           count={pageCount}
           page={page}
-          onChange={(_, v) => setPage(v)}
+          onChange={(_, v) => { setPage(v); setExpandedIdx(null); }}
           color="primary"
           shape="rounded"
         />
       </Stack>
+      {/* 확장 보기 모달 */}
+      <Modal open={expandedIdx !== null} onClose={() => setExpandedIdx(null)} sx={{ zIndex: 1300 }}>
+        <Box sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          bgcolor: 'rgba(0,0,0,0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          {expandedIdx !== null && (
+            <Box sx={{ position: 'relative', maxWidth: 800, width: '90vw', maxHeight: '90vh', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 6, p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <IconButton onClick={() => setExpandedIdx(null)} sx={{ position: 'absolute', top: 8, right: 8, color: '#fff', zIndex: 2 }}>
+                <CloseIcon fontSize="large" />
+              </IconButton>
+              <IconButton onClick={handlePrev} sx={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#fff', zIndex: 2 }}>
+                <ArrowBackIosNewIcon fontSize="large" />
+              </IconButton>
+              <IconButton onClick={handleNext} sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#fff', zIndex: 2 }}>
+                <ArrowForwardIosIcon fontSize="large" />
+              </IconButton>
+              <img
+                src={paged[expandedIdx].url}
+                alt="expanded"
+                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, marginBottom: 16 }}
+              />
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+                {paged[expandedIdx].date} | {paged[expandedIdx].location}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      </Modal>
     </Container>
   );
 } 
