@@ -6,6 +6,10 @@ import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ScrollToTopButton from '@/components/ui/ScrollToTopButton';
+import {
+  getAllPhotos,
+  getAllCategories,
+} from '@/db/utils';
 
 const sampleCategories = [
   { id: 0, name: '전체' },
@@ -33,8 +37,16 @@ export default function GalleryPage() {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [ripple, setRipple] = useState<{ idx: number; x: number; y: number } | null>(null);
   const [modalRipple, setModalRipple] = useState<{ x: number; y: number } | null>(null);
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([{ id: 0, name: '전체' }]);
 
-  const filtered = category === 0 ? samplePhotos : samplePhotos.filter(p => p.categoryId === category);
+  // DB에서 사진/카테고리 fetch
+  useEffect(() => {
+    getAllPhotos().then(data => setPhotos(data));
+    getAllCategories().then(data => setCategories([{ id: 0, name: '전체' }, ...data.map(c => ({ id: c.id, name: c.name }))]));
+  }, []);
+
+  const filtered = category === 0 ? photos : photos.filter(p => p.categoryId === category);
   const paged = filtered.slice((page - 1) * PHOTOS_PER_PAGE, page * PHOTOS_PER_PAGE);
   const pageCount = Math.ceil(filtered.length / PHOTOS_PER_PAGE);
 
@@ -101,7 +113,7 @@ export default function GalleryPage() {
             label="카테고리"
             onChange={e => { setCategory(Number(e.target.value)); setPage(1); setExpandedIdx(null); }}
           >
-            {sampleCategories.map(cat => (
+            {categories.map(cat => (
               <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
             ))}
           </Select>
@@ -122,13 +134,19 @@ export default function GalleryPage() {
                 });
               }}
             >
-              <CardMedia
-                component="img"
-                height="140"
-                image={photo.url}
-                alt="gallery"
-                sx={{ objectFit: 'cover', aspectRatio: '4/3', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.03)' } }}
-              />
+              {photo.thumbnailPath || photo.url ? (
+                <CardMedia
+                  component="img"
+                  height="140"
+                  image={photo.thumbnailPath || photo.url || ''}
+                  alt="gallery"
+                  sx={{ objectFit: 'cover', aspectRatio: '4/3', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.03)' } }}
+                />
+              ) : (
+                <Box sx={{ width: '100%', height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'grey.100', color: 'grey.400' }}>
+                  이미지 없음
+                </Box>
+              )}
               {/* Ripple 효과 */}
               {ripple && ripple.idx === idx && (
                 <Box
@@ -213,7 +231,7 @@ export default function GalleryPage() {
                 <CloseIcon fontSize="large" />
               </IconButton>
               <img
-                src={paged[expandedIdx].url}
+                src={paged[expandedIdx].thumbnailPath || paged[expandedIdx].url || ''}
                 alt="expanded"
                 style={{
                   width: '100%',
