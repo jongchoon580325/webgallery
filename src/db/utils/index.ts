@@ -12,6 +12,11 @@ interface SmartGalleryDB extends DBSchema {
     value: Category;
     indexes: { 'by-name': string };
   };
+  thumbnails: {
+    key: number;
+    value: import('../schema').Thumbnail;
+    indexes: { 'by-photoId': number };
+  };
 }
 
 let db: IDBPDatabase<SmartGalleryDB> | null = null;
@@ -34,6 +39,13 @@ export const initDB = async () => {
         autoIncrement: true,
       });
       categoryStore.createIndex('by-name', 'name');
+
+      // Thumbnails store
+      const thumbStore = database.createObjectStore(STORE_NAMES.THUMBNAILS, {
+        keyPath: 'id',
+        autoIncrement: true,
+      });
+      thumbStore.createIndex('by-photoId', 'photoId');
 
       // Add default categories
       DEFAULT_CATEGORIES.forEach((category) => {
@@ -109,4 +121,15 @@ export const updateCategory = async (category: Category) => {
 export const deleteCategory = async (id: number) => {
   const database = await getDB();
   return database.delete(STORE_NAMES.CATEGORIES, id);
+};
+
+export const addThumbnail = async (thumbnail: Omit<import('../schema').Thumbnail, 'id'>) => {
+  const database = await getDB();
+  return database.add(STORE_NAMES.THUMBNAILS, thumbnail);
+};
+
+export const getThumbnailByPhotoId = async (photoId: number) => {
+  const database = await getDB();
+  const index = database.transaction(STORE_NAMES.THUMBNAILS).store.index('by-photoId');
+  return index.get(photoId);
 }; 

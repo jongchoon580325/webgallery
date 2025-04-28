@@ -13,6 +13,7 @@ import {
   deleteCategory as dbDeleteCategory,
   getAllPhotos,
   addPhoto as dbAddPhoto,
+  addThumbnail as dbAddThumbnail
 } from '@/db/utils';
 
 const defaultCategories = [
@@ -23,6 +24,27 @@ const defaultCategories = [
   { id: 5, name: '조류' },
   { id: 6, name: '기타' },
 ];
+
+// 이미지 리사이즈(썸네일 생성) 함수
+function resizeImage(file: File, maxWidth = 200): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.onload = () => {
+        const scale = maxWidth / img.width;
+        const canvas = document.createElement('canvas');
+        canvas.width = maxWidth;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function ManagementPage() {
   // 카테고리 상태(임시)
@@ -52,22 +74,26 @@ export default function ManagementPage() {
   // 업로드 핸들러
   const handleUpload = async () => {
     if (!form.date || !form.location || !form.photographer || !form.categoryId || form.files.length === 0) return;
-    // 여러 장 업로드 지원
     for (const file of form.files.slice(0, 10)) {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const base64 = e.target?.result as string;
+        // 썸네일 생성
+        const thumbnailBase64 = await resizeImage(file, 200);
+        // 원본 사진 저장
         const photo = {
           filename: file.name,
           originalPath: base64,
-          thumbnailPath: base64, // 썸네일 생성 생략(동일 저장)
+          thumbnailPath: '', // 분리 저장
           date: form.date,
           location: form.location,
           photographer: form.photographer,
           categoryId: Number(form.categoryId),
           uploadDate: new Date().toISOString(),
         };
-        await dbAddPhoto(photo);
+        const photoId = await dbAddPhoto(photo);
+        // 썸네일 별도 저장
+        await dbAddThumbnail({ photoId, data: thumbnailBase64 });
       };
       reader.readAsDataURL(file);
     }

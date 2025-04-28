@@ -17,12 +17,19 @@ export interface Category {
   creationDate: string;
 }
 
+export interface Thumbnail {
+  id?: number;
+  photoId: number; // 원본 사진 id 참조
+  data: string; // base64 or blob url
+}
+
 export const DB_NAME = 'SmartGalleryDB';
 export const DB_VERSION = 1;
 
 export const STORE_NAMES = {
   PHOTOS: 'photos',
   CATEGORIES: 'categories',
+  THUMBNAILS: 'thumbnails',
 } as const;
 
 export const DEFAULT_CATEGORIES = [
