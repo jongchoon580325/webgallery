@@ -212,17 +212,22 @@ export default function GalleryPage() {
               <IconButton onClick={() => setExpandedIdx(null)} sx={{ position: 'absolute', top: 8, right: 8, color: '#fff', zIndex: 2 }}>
                 <CloseIcon fontSize="large" />
               </IconButton>
-              <IconButton onClick={handlePrev} sx={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#fff', zIndex: 2 }}>
-                <ArrowBackIosNewIcon fontSize="large" />
-              </IconButton>
-              <IconButton onClick={handleNext} sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#fff', zIndex: 2 }}>
-                <ArrowForwardIosIcon fontSize="large" />
-              </IconButton>
               <img
                 src={paged[expandedIdx].url}
                 alt="expanded"
-                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, marginBottom: 16, cursor: 'pointer', position: 'relative' }}
-                onClick={e => {
+                style={{
+                  width: '100%',
+                  height: 'auto',
+                  maxWidth: 800,
+                  maxHeight: '70vh',
+                  borderRadius: 8,
+                  marginBottom: 16,
+                  cursor: 'pointer',
+                  position: 'relative',
+                  display: 'block',
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.12)'
+                }}
+                onMouseMove={e => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   setModalRipple({
                     x: e.clientX - rect.left,
@@ -256,6 +261,13 @@ export default function GalleryPage() {
                   }
                 }
               `}</style>
+              {/* 내비게이션 버튼 스타일 개선 */}
+              <IconButton onClick={handlePrev} sx={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#fff', background: 'rgba(0,0,0,0.25)', opacity: 1, zIndex: 2, '&:hover': { background: 'rgba(0,0,0,0.4)' } }}>
+                <ArrowBackIosNewIcon fontSize="large" />
+              </IconButton>
+              <IconButton onClick={handleNext} sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#fff', background: 'rgba(0,0,0,0.25)', opacity: 1, zIndex: 2, '&:hover': { background: 'rgba(0,0,0,0.4)' } }}>
+                <ArrowForwardIosIcon fontSize="large" />
+              </IconButton>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
                 {paged[expandedIdx].date} | {paged[expandedIdx].location}
               </Typography>
