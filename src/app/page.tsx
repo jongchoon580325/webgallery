@@ -3,6 +3,7 @@
 import React from 'react';
 import { Container, Typography, Grid, Card, CardContent, Box } from '@mui/material';
 import { PhotoLibrary, Category, Settings, Speed } from '@mui/icons-material';
+import ScrollToTopButton from '@/components/ui/ScrollToTopButton';
 
 export default function Home() {
   const features = [
@@ -72,6 +73,7 @@ export default function Home() {
           </Grid>
         ))}
       </Grid>
+      <ScrollToTopButton />
     </Container>
   );
 }

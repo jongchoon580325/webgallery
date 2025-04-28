@@ -5,6 +5,7 @@ import { Container, Typography, Box, Divider, Grid, Card, CardContent, CardMedia
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import ScrollToTopButton from '@/components/ui/ScrollToTopButton';
 
 const sampleCategories = [
   { id: 0, name: '전체' },
@@ -30,6 +31,8 @@ export default function GalleryPage() {
   const [category, setCategory] = useState(0);
   const [page, setPage] = useState(1);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [ripple, setRipple] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const [modalRipple, setModalRipple] = useState<{ x: number; y: number } | null>(null);
 
   const filtered = category === 0 ? samplePhotos : samplePhotos.filter(p => p.categoryId === category);
   const paged = filtered.slice((page - 1) * PHOTOS_PER_PAGE, page * PHOTOS_PER_PAGE);
@@ -57,6 +60,21 @@ export default function GalleryPage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [expandedIdx, handlePrev, handleNext]);
+
+  // Ripple 애니메이션 종료 후 상태 초기화
+  useEffect(() => {
+    if (ripple) {
+      const timeout = setTimeout(() => setRipple(null), 600);
+      return () => clearTimeout(timeout);
+    }
+  }, [ripple]);
+
+  useEffect(() => {
+    if (modalRipple) {
+      const timeout = setTimeout(() => setModalRipple(null), 600);
+      return () => clearTimeout(timeout);
+    }
+  }, [modalRipple]);
 
   return (
     <Container maxWidth="lg">
@@ -92,7 +110,18 @@ export default function GalleryPage() {
       <Grid container spacing={2} columns={{ xs: 2, sm: 4, md: 5 }}>
         {paged.map((photo, idx) => (
           <Grid item xs={1} sm={1} md={1} key={photo.id}>
-            <Card sx={{ borderRadius: 2, overflow: 'hidden', height: '100%', position: 'relative', cursor: 'pointer' }} onClick={() => setExpandedIdx(idx)}>
+            <Card
+              sx={{ borderRadius: 2, overflow: 'hidden', height: '100%', position: 'relative', cursor: 'pointer' }}
+              onClick={() => setExpandedIdx(idx)}
+              onMouseMove={e => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setRipple({
+                  idx,
+                  x: e.clientX - rect.left,
+                  y: e.clientY - rect.top,
+                });
+              }}
+            >
               <CardMedia
                 component="img"
                 height="140"
@@ -100,6 +129,43 @@ export default function GalleryPage() {
                 alt="gallery"
                 sx={{ objectFit: 'cover', aspectRatio: '4/3', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.03)' } }}
               />
+              {/* Ripple 효과 */}
+              {ripple && ripple.idx === idx && (
+                <Box
+                  sx={{
+                    pointerEvents: 'none',
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: '100%',
+                    height: '100%',
+                    zIndex: 2,
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: ripple.x - 100,
+                      top: ripple.y - 100,
+                      width: 200,
+                      height: 200,
+                      borderRadius: '50%',
+                      background: 'rgba(255,255,255,0.35)',
+                      transform: 'scale(0)',
+                      animation: 'ripple-wave 0.6s cubic-bezier(0.4,0,0.2,1) forwards',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  <style>{`
+                    @keyframes ripple-wave {
+                      to {
+                        transform: scale(2.5);
+                        opacity: 0;
+                      }
+                    }
+                  `}</style>
+                </Box>
+              )}
               {/* 메타데이터 오버레이 */}
               <Box sx={{
                 position: 'absolute',
@@ -155,8 +221,41 @@ export default function GalleryPage() {
               <img
                 src={paged[expandedIdx].url}
                 alt="expanded"
-                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, marginBottom: 16 }}
+                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, marginBottom: 16, cursor: 'pointer', position: 'relative' }}
+                onClick={e => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setModalRipple({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                  });
+                }}
               />
+              {/* 모달 ripple 효과 */}
+              {modalRipple && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: modalRipple.x - 120,
+                    top: modalRipple.y - 120,
+                    width: 240,
+                    height: 240,
+                    borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.15)',
+                    transform: 'scale(0)',
+                    animation: 'ripple-wave-modal 0.6s cubic-bezier(0.4,0,0.2,1) forwards',
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                  }}
+                />
+              )}
+              <style>{`
+                @keyframes ripple-wave-modal {
+                  to {
+                    transform: scale(2.5);
+                    opacity: 0;
+                  }
+                }
+              `}</style>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
                 {paged[expandedIdx].date} | {paged[expandedIdx].location}
               </Typography>
@@ -164,6 +263,7 @@ export default function GalleryPage() {
           )}
         </Box>
       </Modal>
+      <ScrollToTopButton />
     </Container>
   );
 } 

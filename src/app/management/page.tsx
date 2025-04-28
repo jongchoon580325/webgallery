@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Container, Typography, Box, Divider } from '@mui/material';
+import ScrollToTopButton from '@/components/ui/ScrollToTopButton';
 
 export default function ManagementPage() {
   return (
@@ -28,6 +29,7 @@ export default function ManagementPage() {
       <Typography variant="body1" color="text.secondary" align="center">
         관리 페이지 컨텐츠가 곧 추가될 예정입니다.
       </Typography>
+      <ScrollToTopButton />
     </Container>
   );
 } 
