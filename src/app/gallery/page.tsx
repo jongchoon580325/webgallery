@@ -9,6 +9,7 @@ import ScrollToTopButton from '@/components/ui/ScrollToTopButton';
 import {
   getAllPhotos,
   getAllCategories,
+  getThumbnailByPhotoId,
 } from '@/db/utils';
 
 const sampleCategories = [
@@ -42,8 +43,24 @@ export default function GalleryPage() {
 
   // DB에서 사진/카테고리 fetch
   useEffect(() => {
-    getAllPhotos().then(data => setPhotos(data));
-    getAllCategories().then(data => setCategories([{ id: 0, name: '전체' }, ...data.map(c => ({ id: c.id, name: c.name }))]));
+    async function fetchPhotosWithThumbnails() {
+      const data = await getAllPhotos();
+      const photosWithThumb = await Promise.all(
+        data.map(async (photo) => {
+          if (typeof photo.id === 'number') {
+            const thumb = await getThumbnailByPhotoId(photo.id);
+            return { ...photo, thumbnailPath: thumb?.data || '' };
+          }
+          return { ...photo, thumbnailPath: '' };
+        })
+      );
+      setPhotos(photosWithThumb);
+    }
+    fetchPhotosWithThumbnails();
+
+    getAllCategories().then(data =>
+      setCategories([{ id: 0, name: '전체' }, ...data.map(c => ({ id: c.id, name: c.name }))])
+    );
   }, []);
 
   const filtered = category === 0 ? photos : photos.filter(p => p.categoryId === category);
