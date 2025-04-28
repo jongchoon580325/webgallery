@@ -20,51 +20,86 @@ interface SmartGalleryDB extends DBSchema {
 }
 
 let db: IDBPDatabase<SmartGalleryDB> | null = null;
+let dbInitPromise: Promise<IDBPDatabase<SmartGalleryDB>> | null = null;
 
 export const initDB = async () => {
   if (db) return db;
+  
+  // 이미 초기화가 진행 중이라면 해당 Promise를 반환
+  if (dbInitPromise) return dbInitPromise;
 
-  db = await openDB<SmartGalleryDB>(DB_NAME, DB_VERSION, {
-    upgrade(database) {
-      // Photos store
-      const photoStore = database.createObjectStore(STORE_NAMES.PHOTOS, {
-        keyPath: 'id',
-        autoIncrement: true,
-      });
-      photoStore.createIndex('by-category', 'categoryId');
+  try {
+    dbInitPromise = openDB<SmartGalleryDB>(DB_NAME, DB_VERSION, {
+      upgrade(database) {
+        // Photos store가 없을 경우에만 생성
+        if (!database.objectStoreNames.contains(STORE_NAMES.PHOTOS)) {
+          const photoStore = database.createObjectStore(STORE_NAMES.PHOTOS, {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          photoStore.createIndex('by-category', 'categoryId');
+        }
 
-      // Categories store
-      const categoryStore = database.createObjectStore(STORE_NAMES.CATEGORIES, {
-        keyPath: 'id',
-        autoIncrement: true,
-      });
-      categoryStore.createIndex('by-name', 'name');
+        // Categories store가 없을 경우에만 생성
+        if (!database.objectStoreNames.contains(STORE_NAMES.CATEGORIES)) {
+          const categoryStore = database.createObjectStore(STORE_NAMES.CATEGORIES, {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          categoryStore.createIndex('by-name', 'name');
 
-      // Thumbnails store
-      const thumbStore = database.createObjectStore(STORE_NAMES.THUMBNAILS, {
-        keyPath: 'id',
-        autoIncrement: true,
-      });
-      thumbStore.createIndex('by-photoId', 'photoId');
+          // Add default categories
+          DEFAULT_CATEGORIES.forEach((category) => {
+            categoryStore.add({
+              ...category,
+              creationDate: new Date().toISOString(),
+            });
+          });
+        }
 
-      // Add default categories
-      DEFAULT_CATEGORIES.forEach((category) => {
-        categoryStore.add({
-          ...category,
-          creationDate: new Date().toISOString(),
-        });
-      });
-    },
-  });
+        // Thumbnails store가 없을 경우에만 생성
+        if (!database.objectStoreNames.contains(STORE_NAMES.THUMBNAILS)) {
+          const thumbStore = database.createObjectStore(STORE_NAMES.THUMBNAILS, {
+            keyPath: 'id',
+            autoIncrement: true,
+          });
+          thumbStore.createIndex('by-photoId', 'photoId');
+        }
+      },
+      blocked() {
+        console.warn('Database upgrade was blocked');
+      },
+      blocking() {
+        console.warn('Database is blocking an upgrade');
+        db?.close();
+      },
+      terminated() {
+        console.error('Database connection was terminated');
+        db = null;
+        dbInitPromise = null;
+      },
+    });
 
-  return db;
+    db = await dbInitPromise;
+    return db;
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    db = null;
+    dbInitPromise = null;
+    throw error;
+  }
 };
 
 export const getDB = async () => {
-  if (!db) {
-    await initDB();
+  try {
+    if (!db) {
+      await initDB();
+    }
+    return db!;
+  } catch (error) {
+    console.error('Failed to get database connection:', error);
+    throw error;
   }
-  return db!;
 };
 
 export const addPhoto = async (photo: Omit<Photo, 'id'>) => {
@@ -132,4 +167,31 @@ export const getThumbnailByPhotoId = async (photoId: number) => {
   const database = await getDB();
   const index = database.transaction(STORE_NAMES.THUMBNAILS).store.index('by-photoId');
   return index.get(photoId);
+};
+
+// DB 연결 종료 함수 추가
+export const closeDB = () => {
+  if (db) {
+    db.close();
+    db = null;
+    dbInitPromise = null;
+  }
+};
+
+// 트랜잭션 래퍼 함수 수정
+export const withTransaction = async <T>(
+  storeName: typeof STORE_NAMES[keyof typeof STORE_NAMES],
+  mode: 'readonly' | 'readwrite',
+  callback: (store: any) => Promise<T>
+): Promise<T> => {
+  const database = await getDB();
+  const tx = database.transaction(storeName, mode);
+  try {
+    const result = await callback(tx.store);
+    await tx.done;
+    return result;
+  } catch (error) {
+    console.error(`Transaction failed for store ${storeName}:`, error);
+    throw error;
+  }
 }; 
