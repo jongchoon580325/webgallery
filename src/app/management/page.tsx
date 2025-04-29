@@ -56,6 +56,46 @@ function resizeImage(file: File, maxWidth = 200): Promise<string> {
   });
 }
 
+// 원본 이미지 리사이즈(압축) 함수
+function resizeOriginalImage(file: File, maxWidth = 1920, quality = 0.8): Promise<string> {
+  return new Promise((resolve) => {
+    if (file.size <= 2 * 1024 * 1024) { // 2MB 이하면 원본 유지
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.readAsDataURL(file);
+      return;
+    }
+    const img = new window.Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.onload = () => {
+        let targetWidth = img.width;
+        let targetHeight = img.height;
+        if (img.width > maxWidth) {
+          const scale = maxWidth / img.width;
+          targetWidth = maxWidth;
+          targetHeight = img.height * scale;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// 이미지 데이터 URL의 크기를 MB 단위로 계산하는 함수
+function calculateImageSize(dataUrl: string): number {
+  const base64Length = dataUrl.split(',')[1].length;
+  const sizeInBytes = (base64Length * 3) / 4;
+  return Number((sizeInBytes / (1024 * 1024)).toFixed(2));
+}
+
 export default function ManagementPage() {
   // 카테고리 상태 초기화를 빈 배열로 변경 (타입 명시)
   const [categories, setCategories] = useState<Category[]>([]);
@@ -98,35 +138,37 @@ export default function ManagementPage() {
     if (!form.date || !form.location || !form.photographer || !form.categoryId || form.files.length === 0) return;
     
     try {
+      let totalSize = 0;
       for (const file of form.files.slice(0, 10)) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const base64 = e.target?.result as string;
-          // 썸네일 생성
-          const thumbnailBase64 = await resizeImage(file, 200);
-          // 원본 사진 저장
-          const photo = {
-            filename: file.name,
-            originalPath: base64,
-            thumbnailPath: '', // 분리 저장
-            date: form.date,
-            location: form.location,
-            photographer: form.photographer,
-            categoryId: Number(form.categoryId),
-            uploadDate: new Date().toISOString(),
-          };
-          const photoId = await dbAddPhoto(photo) as number;
-          // 썸네일 별도 저장
-          await dbAddThumbnail({ photoId, data: thumbnailBase64 });
+        // 원본 이미지 리사이즈/압축
+        const originalBase64 = await resizeOriginalImage(file, 1920, 0.8);
+        // 썸네일 생성
+        const thumbnailBase64 = await resizeImage(file, 200);
+        
+        // 변환된 이미지 크기 계산
+        totalSize += calculateImageSize(originalBase64);
+        
+        // 원본 사진 저장
+        const photo = {
+          filename: file.name,
+          originalPath: originalBase64,
+          thumbnailPath: '', // 분리 저장
+          date: form.date,
+          location: form.location,
+          photographer: form.photographer,
+          categoryId: Number(form.categoryId),
+          uploadDate: new Date().toISOString(),
         };
-        reader.readAsDataURL(file);
+        const photoId = await dbAddPhoto(photo) as number;
+        // 썸네일 별도 저장
+        await dbAddThumbnail({ photoId, data: thumbnailBase64 });
       }
       setForm({ date: '', location: '', photographer: '', categoryId: '', files: [] });
       
-      // alert 대신 성공 모달 표시
+      // 성공 모달 표시 (저장된 크기 정보 포함)
       setSuccessModal({
         open: true,
-        message: `${form.files.length}장의 사진이 성공적으로 업로드되었습니다!`,
+        message: `${form.files.length}장의 사진이 성공적으로 업로드되었습니다!\n(저장된 크기: ${totalSize.toFixed(2)}MB)`,
       });
     } catch (error) {
       console.error('사진 업로드 중 오류:', error);
