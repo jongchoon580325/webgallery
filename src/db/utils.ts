@@ -1,17 +1,36 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'photo-gallery-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+
+// 기본 카테고리 정의
+const defaultCategories = [
+  { id: 1, name: '가족', creationDate: new Date().toISOString() },
+  { id: 2, name: '인물', creationDate: new Date().toISOString() },
+  { id: 3, name: '풍경', creationDate: new Date().toISOString() },
+  { id: 4, name: '꽃', creationDate: new Date().toISOString() },
+  { id: 5, name: '식물', creationDate: new Date().toISOString() },
+  { id: 6, name: '조류', creationDate: new Date().toISOString() },
+  { id: 7, name: '기타', creationDate: new Date().toISOString() },
+];
 
 // DB 초기화
 async function initDB() {
   const db = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // 카테고리 스토어
-      if (!db.objectStoreNames.contains('categories')) {
-        const categoryStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
-        categoryStore.createIndex('name', 'name', { unique: true });
+    upgrade(db, oldVersion, newVersion) {
+      // 기존 카테고리 스토어가 있다면 삭제
+      if (db.objectStoreNames.contains('categories')) {
+        db.deleteObjectStore('categories');
       }
+      
+      // 카테고리 스토어 재생성
+      const categoryStore = db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true });
+      categoryStore.createIndex('name', 'name', { unique: false });  // unique 제약 해제
+      
+      // 기본 카테고리 추가
+      defaultCategories.forEach(category => {
+        categoryStore.put(category);
+      });
       
       // 사진 스토어
       if (!db.objectStoreNames.contains('photos')) {
@@ -20,13 +39,33 @@ async function initDB() {
         photoStore.createIndex('date', 'date');
       }
 
-      // 썸네일 스토어 (별도 저장)
+      // 썸네일 스토어
       if (!db.objectStoreNames.contains('thumbnails')) {
         db.createObjectStore('thumbnails', { keyPath: 'photoId' });
       }
     },
   });
   return db;
+}
+
+// 기본 카테고리 복구 함수
+export async function restoreDefaultCategories() {
+  const db = await openDB(DB_NAME);
+  const tx = db.transaction('categories', 'readwrite');
+  const store = tx.objectStore('categories');
+  
+  // 현재 카테고리 확인
+  const existingCategories = await store.getAll();
+  
+  // 기본 카테고리 중 없는 것들만 추가
+  for (const category of defaultCategories) {
+    const exists = existingCategories.some(c => c.id === category.id);
+    if (!exists) {
+      await store.put(category);
+    }
+  }
+  
+  await tx.done;
 }
 
 // 카테고리 관련 함수들
@@ -85,8 +124,14 @@ export async function addThumbnail(thumbnail: { photoId: number; data: string })
   return db.put('thumbnails', thumbnail);
 }
 
+// 썸네일 가져오기 함수
+export async function getThumbnailByPhotoId(photoId: number) {
+  const db = await openDB(DB_NAME);
+  return db.get('thumbnails', photoId);
+}
+
 export async function deletePhoto(photoId: number) {
-  const db = await openDB();
+  const db = await openDB(DB_NAME);
   const tx = db.transaction(['photos', 'thumbnails'], 'readwrite');
   
   // Delete photo from photos store
@@ -97,5 +142,7 @@ export async function deletePhoto(photoId: number) {
   await tx.done;
 }
 
-// DB 초기화 실행
-initDB().catch(console.error); 
+// DB 초기화 실행 및 기본 카테고리 복구
+initDB()
+  .then(() => restoreDefaultCategories())
+  .catch(console.error); 

@@ -13,7 +13,8 @@ import {
   deleteCategory as dbDeleteCategory,
   getAllPhotos,
   addPhoto as dbAddPhoto,
-  addThumbnail as dbAddThumbnail
+  addThumbnail as dbAddThumbnail,
+  restoreDefaultCategories
 } from '@/db/utils';
 
 // 기본 카테고리 상수로 정의
@@ -21,10 +22,17 @@ const defaultCategories = [
   { id: 1, name: '가족' },
   { id: 2, name: '인물' },
   { id: 3, name: '풍경' },
-  { id: 4, name: '식물' },
-  { id: 5, name: '조류' },
-  { id: 6, name: '기타' },
+  { id: 4, name: '꽃' },
+  { id: 5, name: '식물' },
+  { id: 6, name: '조류' },
+  { id: 7, name: '기타' },
 ];
+
+// 카테고리 타입 정의
+interface Category {
+  id: number;
+  name: string;
+}
 
 // 이미지 리사이즈(썸네일 생성) 함수
 function resizeImage(file: File, maxWidth = 200): Promise<string> {
@@ -48,8 +56,8 @@ function resizeImage(file: File, maxWidth = 200): Promise<string> {
 }
 
 export default function ManagementPage() {
-  // 카테고리 상태 초기화를 빈 배열로 변경
-  const [categories, setCategories] = useState([]);
+  // 카테고리 상태 초기화를 빈 배열로 변경 (타입 명시)
+  const [categories, setCategories] = useState<Category[]>([]);
   const [newCategory, setNewCategory] = useState('');
   const [editId, setEditId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -66,16 +74,11 @@ export default function ManagementPage() {
   // DB 연동: 카테고리 fetch
   const fetchCategories = async () => {
     try {
+      await restoreDefaultCategories(); // 기본 카테고리 복구
       const cats = await getAllCategories();
-      // DB에 카테고리가 없는 경우에만 기본 카테고리 사용
-      if (!cats || cats.length === 0) {
-        setCategories(defaultCategories);
-      } else {
-        setCategories(cats.map(c => ({ id: c.id!, name: c.name })));
-      }
+      setCategories(cats.map(c => ({ id: c.id!, name: c.name })));
     } catch (error) {
       console.error('카테고리 로딩 중 오류:', error);
-      // 에러 발생 시 기본 카테고리 사용
       setCategories(defaultCategories);
     }
   };
@@ -105,7 +108,7 @@ export default function ManagementPage() {
           categoryId: Number(form.categoryId),
           uploadDate: new Date().toISOString(),
         };
-        const photoId = await dbAddPhoto(photo);
+        const photoId = await dbAddPhoto(photo) as number;
         // 썸네일 별도 저장
         await dbAddThumbnail({ photoId, data: thumbnailBase64 });
       };
@@ -123,16 +126,27 @@ export default function ManagementPage() {
   // 카테고리 추가
   const handleAddCategory = async () => {
     const name = newCategory.trim();
-    if (!name || categories.some(c => c.name === name)) return;
-    const newCat = { name, creationDate: new Date().toISOString() };
-    await dbAddCategory(newCat);
-    setNewCategory('');
-    fetchCategories(); // 직접 추가하지 않고 fetch로만 동기화
+    if (!name) return;
+    
+    try {
+      const newCat = { name, creationDate: new Date().toISOString() };
+      const newId = await dbAddCategory(newCat) as number;
+      
+      // 상태 업데이트 - 새 카테고리를 기존 목록에 추가
+      setCategories(prevCategories => [...prevCategories, { id: newId, name }]);
+      setNewCategory('');
+    } catch (error) {
+      console.error('카테고리 추가 중 오류:', error);
+      alert('카테고리 추가 중 오류가 발생했습니다.');
+    }
   };
-  const handleAddCategoryKey = (e: React.KeyboardEvent) => {
+
+  const handleAddCategoryKey = async (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddCategory();
+      e.preventDefault(); // 이벤트 기본 동작 방지
+      if (!e.repeat) { // 키 반복 입력 방지
+        await handleAddCategory();
+      }
     }
   };
 
