@@ -6,6 +6,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ScrollToTopButton from '@/components/ui/ScrollToTopButton';
+import SuccessModal from '@/components/ui/SuccessModal';
 import {
   getAllCategories,
   addCategory as dbAddCategory,
@@ -61,6 +62,10 @@ export default function ManagementPage() {
   const [newCategory, setNewCategory] = useState('');
   const [editId, setEditId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [successModal, setSuccessModal] = useState({
+    open: false,
+    message: '',
+  });
 
   // 업로드 폼 상태(임시)
   const [form, setForm] = useState({
@@ -91,31 +96,42 @@ export default function ManagementPage() {
   // 업로드 핸들러
   const handleUpload = async () => {
     if (!form.date || !form.location || !form.photographer || !form.categoryId || form.files.length === 0) return;
-    for (const file of form.files.slice(0, 10)) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const base64 = e.target?.result as string;
-        // 썸네일 생성
-        const thumbnailBase64 = await resizeImage(file, 200);
-        // 원본 사진 저장
-        const photo = {
-          filename: file.name,
-          originalPath: base64,
-          thumbnailPath: '', // 분리 저장
-          date: form.date,
-          location: form.location,
-          photographer: form.photographer,
-          categoryId: Number(form.categoryId),
-          uploadDate: new Date().toISOString(),
+    
+    try {
+      for (const file of form.files.slice(0, 10)) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const base64 = e.target?.result as string;
+          // 썸네일 생성
+          const thumbnailBase64 = await resizeImage(file, 200);
+          // 원본 사진 저장
+          const photo = {
+            filename: file.name,
+            originalPath: base64,
+            thumbnailPath: '', // 분리 저장
+            date: form.date,
+            location: form.location,
+            photographer: form.photographer,
+            categoryId: Number(form.categoryId),
+            uploadDate: new Date().toISOString(),
+          };
+          const photoId = await dbAddPhoto(photo) as number;
+          // 썸네일 별도 저장
+          await dbAddThumbnail({ photoId, data: thumbnailBase64 });
         };
-        const photoId = await dbAddPhoto(photo) as number;
-        // 썸네일 별도 저장
-        await dbAddThumbnail({ photoId, data: thumbnailBase64 });
-      };
-      reader.readAsDataURL(file);
+        reader.readAsDataURL(file);
+      }
+      setForm({ date: '', location: '', photographer: '', categoryId: '', files: [] });
+      
+      // alert 대신 성공 모달 표시
+      setSuccessModal({
+        open: true,
+        message: `${form.files.length}장의 사진이 성공적으로 업로드되었습니다!`,
+      });
+    } catch (error) {
+      console.error('사진 업로드 중 오류:', error);
+      alert('사진 업로드 중 오류가 발생했습니다.');
     }
-    setForm({ date: '', location: '', photographer: '', categoryId: '', files: [] });
-    alert('사진 업로드 완료!');
   };
 
   // 업로드 엔터키 지원
@@ -328,6 +344,11 @@ export default function ManagementPage() {
           </Paper>
         </Grid>
       </Grid>
+      <SuccessModal
+        open={successModal.open}
+        onClose={() => setSuccessModal({ ...successModal, open: false })}
+        message={successModal.message}
+      />
       <ScrollToTopButton />
     </Container>
   );
