@@ -16,6 +16,7 @@ import {
   addThumbnail as dbAddThumbnail
 } from '@/db/utils';
 
+// 기본 카테고리 상수로 정의
 const defaultCategories = [
   { id: 1, name: '가족' },
   { id: 2, name: '인물' },
@@ -47,8 +48,8 @@ function resizeImage(file: File, maxWidth = 200): Promise<string> {
 }
 
 export default function ManagementPage() {
-  // 카테고리 상태(임시)
-  const [categories, setCategories] = useState(defaultCategories);
+  // 카테고리 상태 초기화를 빈 배열로 변경
+  const [categories, setCategories] = useState([]);
   const [newCategory, setNewCategory] = useState('');
   const [editId, setEditId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -64,9 +65,22 @@ export default function ManagementPage() {
 
   // DB 연동: 카테고리 fetch
   const fetchCategories = async () => {
-    const cats = await getAllCategories();
-    setCategories(cats.map(c => ({ id: c.id!, name: c.name })));
+    try {
+      const cats = await getAllCategories();
+      // DB에 카테고리가 없는 경우에만 기본 카테고리 사용
+      if (!cats || cats.length === 0) {
+        setCategories(defaultCategories);
+      } else {
+        setCategories(cats.map(c => ({ id: c.id!, name: c.name })));
+      }
+    } catch (error) {
+      console.error('카테고리 로딩 중 오류:', error);
+      // 에러 발생 시 기본 카테고리 사용
+      setCategories(defaultCategories);
+    }
   };
+
+  // 컴포넌트 마운트 시 한 번만 실행
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -236,7 +250,19 @@ export default function ManagementPage() {
                 fullWidth
                 onKeyDown={handleAddCategoryKey}
               />
-              <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={handleAddCategory} type="button">
+              <Button 
+                variant="contained" 
+                color="primary" 
+                startIcon={<AddIcon />} 
+                onClick={handleAddCategory} 
+                type="button"
+                sx={{ 
+                  height: '40px',  // TextField의 기본 높이와 동일
+                  minWidth: '140px', // 버튼의 최소 너비 증가
+                  whiteSpace: 'nowrap', // 텍스트 줄바꿈 방지
+                  flexShrink: 0 // 버튼 크기 고정
+                }}
+              >
                 추가
               </Button>
             </Box>
