@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Container, Typography, Box, Divider, Grid, TextField, Button, MenuItem, Paper, List, ListItem, ListItemText, IconButton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -15,7 +15,11 @@ import {
   getAllPhotos,
   addPhoto as dbAddPhoto,
   addThumbnail as dbAddThumbnail,
-  restoreDefaultCategories
+  restoreDefaultCategories,
+  exportPhotosData,
+  importPhotosData,
+  exportCategoriesData,
+  importCategoriesData
 } from '@/db/utils';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
@@ -64,6 +68,10 @@ export default function ManagementPage() {
     categoryId: '',
     files: [] as File[],
   });
+
+  // 파일 입력을 위한 ref 추가
+  const photoDataFileRef = useRef<HTMLInputElement>(null);
+  const categoryDataFileRef = useRef<HTMLInputElement>(null);
 
   // DB 연동: 카테고리 fetch
   const fetchCategories = async () => {
@@ -178,6 +186,63 @@ export default function ManagementPage() {
     if (id <= 6) return alert('기본 카테고리는 삭제할 수 없습니다.');
     await dbDeleteCategory(id);
     setCategories(cats => cats.filter(c => c.id !== id));
+  };
+
+  // 사진 DB 데이터 내보내기/가져오기 핸들러
+  const handleExportPhotosData = () => {
+    exportPhotosData();
+  };
+
+  const handleImportPhotosData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await importPhotosData(file);
+      setSuccessModal({
+        open: true,
+        message: '사진 DB 데이터를 성공적으로 가져왔습니다.'
+      });
+      // 파일 입력 초기화
+      if (photoDataFileRef.current) {
+        photoDataFileRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('사진 DB 데이터 가져오기 실패:', error);
+      setSuccessModal({
+        open: true,
+        message: '사진 DB 데이터 가져오기에 실패했습니다.'
+      });
+    }
+  };
+
+  // 카테고리 데이터 내보내기/가져오기 핸들러
+  const handleExportCategoriesData = () => {
+    exportCategoriesData();
+  };
+
+  const handleImportCategoriesData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await importCategoriesData(file);
+      await fetchCategories(); // 카테고리 목록 새로고침
+      setSuccessModal({
+        open: true,
+        message: '카테고리 데이터를 성공적으로 가져왔습니다.'
+      });
+      // 파일 입력 초기화
+      if (categoryDataFileRef.current) {
+        categoryDataFileRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('카테고리 데이터 가져오기 실패:', error);
+      setSuccessModal({
+        open: true,
+        message: '카테고리 데이터 가져오기에 실패했습니다.'
+      });
+    }
   };
 
   return (
@@ -347,31 +412,6 @@ export default function ManagementPage() {
           <Paper sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>사진 데이터 관리</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {/* 사진 데이터(원본) 관리 */}
-              <Box>
-                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
-                  사진 데이터 (원본)
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    startIcon={<FileDownloadIcon />}
-                    sx={{ flex: 1 }}
-                  >
-                    내보내기
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    startIcon={<FileUploadIcon />}
-                    sx={{ flex: 1 }}
-                  >
-                    가져오기
-                  </Button>
-                </Box>
-              </Box>
-              
               {/* 사진 DB 데이터 관리 */}
               <Box>
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
@@ -382,14 +422,23 @@ export default function ManagementPage() {
                     variant="outlined"
                     color="primary"
                     startIcon={<FileDownloadIcon />}
+                    onClick={handleExportPhotosData}
                     sx={{ flex: 1 }}
                   >
                     내보내기
                   </Button>
+                  <input
+                    type="file"
+                    accept=".json"
+                    style={{ display: 'none' }}
+                    ref={photoDataFileRef}
+                    onChange={handleImportPhotosData}
+                  />
                   <Button
                     variant="outlined"
                     color="primary"
                     startIcon={<FileUploadIcon />}
+                    onClick={() => photoDataFileRef.current?.click()}
                     sx={{ flex: 1 }}
                   >
                     가져오기
@@ -415,14 +464,23 @@ export default function ManagementPage() {
                     variant="outlined"
                     color="primary"
                     startIcon={<FileDownloadIcon />}
+                    onClick={handleExportCategoriesData}
                     sx={{ flex: 1 }}
                   >
                     내보내기
                   </Button>
+                  <input
+                    type="file"
+                    accept=".json"
+                    style={{ display: 'none' }}
+                    ref={categoryDataFileRef}
+                    onChange={handleImportCategoriesData}
+                  />
                   <Button
                     variant="outlined"
                     color="primary"
                     startIcon={<FileUploadIcon />}
+                    onClick={() => categoryDataFileRef.current?.click()}
                     sx={{ flex: 1 }}
                   >
                     가져오기
