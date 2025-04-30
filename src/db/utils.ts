@@ -457,6 +457,19 @@ export const importOriginalPhotos = async (
   });
 };
 
+// 전체 데이터 초기화 함수
+export async function resetAllData() {
+  const db = await openDB(DB_NAME, DB_VERSION);
+  // 모든 사진/썸네일/카테고리 삭제
+  await db.clear('photos');
+  await db.clear('thumbnails');
+  await db.clear('categories');
+  // 기본 카테고리 복구
+  for (const category of defaultCategories) {
+    await db.add('categories', category);
+  }
+}
+
 // DB 초기화 실행 및 기본 카테고리 복구
 initDB()
   .then(() => restoreDefaultCategories())

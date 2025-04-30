@@ -18,7 +18,13 @@ const Footer: React.FC = () => {
           color={theme => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'} 
           align="center"
         >
-          Smart Gallery - Built by Najongchoon | Contact: najongchoon@gmail.com
+          Smart Gallery - Built by Najongchoon | Contact: 
+          <a 
+            href="mailto:najongchoon@gmail.com" 
+            style={{ color: '#1976d2', textDecoration: 'underline', fontWeight: 500 }}
+          >
+            najongchoon@gmail.com
+          </a>
         </Typography>
       </Container>
     </Box>

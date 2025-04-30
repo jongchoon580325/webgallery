@@ -21,11 +21,23 @@ import {
   exportCategoriesData,
   importCategoriesData,
   exportOriginalPhotos,
-  importOriginalPhotos
+  importOriginalPhotos,
+  resetAllData
 } from '@/db/utils';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import { optimizeImageThumbnail, optimizeOriginalImage } from '@/utils/imageOptimizer';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import CancelIcon from '@mui/icons-material/Cancel';
+import InfoIcon from '@mui/icons-material/Info';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import FolderZipIcon from '@mui/icons-material/FolderZip';
 
 // 기본 카테고리 상수로 정의
 const defaultCategories = [
@@ -78,6 +90,10 @@ export default function ManagementPage() {
   // 진행률 상태 추가
   const [progress, setProgress] = useState<number | null>(null);
   const originalPhotosFileRef = useRef<HTMLInputElement>(null);
+
+  // 데이터 초기화 관련 상태
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   // DB 연동: 카테고리 fetch
   const fetchCategories = async () => {
@@ -299,6 +315,27 @@ export default function ManagementPage() {
       });
     } finally {
       setProgress(null);
+    }
+  };
+
+  // 데이터 초기화 핸들러
+  const handleResetAllData = async () => {
+    setResetLoading(true);
+    try {
+      await resetAllData();
+      await fetchCategories();
+      setSuccessModal({
+        open: true,
+        message: '모든 데이터가 초기화되었습니다. (원본 사진, DB, 카테고리)'
+      });
+    } catch (error) {
+      setSuccessModal({
+        open: true,
+        message: '데이터 초기화 중 오류가 발생했습니다.'
+      });
+    } finally {
+      setResetLoading(false);
+      setResetDialogOpen(false);
     }
   };
 
@@ -586,6 +623,24 @@ export default function ManagementPage() {
                   </Button>
                 </Box>
               </Box>
+              {/* 데이터 초기화 컴포넌트 - 내보내기/가져오기 아래에 위치 */}
+              <Box sx={{ p: 2, bgcolor: 'rgba(255,0,0,0.04)', borderRadius: 2, border: '1px solid #f44336' }}>
+                <Typography variant="h6" color="error" gutterBottom>데이터 초기화</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  모든 데이터가 초기화 되오니 <b>조심하여 주시기 바랍니다.</b>
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="error"
+                  fullWidth
+                  size="large"
+                  onClick={() => setResetDialogOpen(true)}
+                  sx={{ fontWeight: 'bold', fontSize: 16 }}
+                  disabled={resetLoading}
+                >
+                  데이터 초기화
+                </Button>
+              </Box>
             </Box>
           </Paper>
         </Grid>
@@ -596,6 +651,145 @@ export default function ManagementPage() {
         message={successModal.message}
       />
       <ScrollToTopButton />
+      <Dialog 
+        open={resetDialogOpen} 
+        onClose={() => setResetDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            width: '400px',
+            height: '400px',
+            maxHeight: '400px',
+            borderRadius: 2,
+            p: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          textAlign: 'center', 
+          fontSize: '1.8rem', 
+          fontWeight: 'bold',
+          color: 'error.main',
+          pb: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 1
+        }}>
+          <WarningAmberIcon sx={{ fontSize: '2rem' }} />
+          데이터 초기화 확인
+        </DialogTitle>
+        <DialogContent sx={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          textAlign: 'center'
+        }}>
+          <DeleteForeverIcon sx={{ 
+            fontSize: '4rem', 
+            color: 'error.main',
+            mb: 2
+          }} />
+          <DialogContentText sx={{ 
+            fontSize: '1.1rem',
+            lineHeight: 1.8,
+            fontWeight: 'medium'
+          }}>
+            이 작업은 <b>원본 사진, DB 데이터, 카테고리 데이터</b>를 모두 삭제하고 기본 카테고리만 복구합니다. 정말 초기화하시겠습니까?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ 
+          p: 3,
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 2
+        }}>
+          <Button 
+            onClick={() => setResetDialogOpen(false)} 
+            disabled={resetLoading}
+            variant="outlined"
+            size="large"
+            startIcon={<CancelIcon />}
+            sx={{ 
+              width: '120px',
+              fontSize: '1.1rem'
+            }}
+          >
+            취소
+          </Button>
+          <Button 
+            onClick={handleResetAllData} 
+            color="error" 
+            disabled={resetLoading} 
+            variant="contained"
+            size="large"
+            startIcon={<DeleteForeverIcon />}
+            sx={{ 
+              width: '120px',
+              fontSize: '1.1rem'
+            }}
+          >
+            {resetLoading ? '초기화 중...' : '초기화'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* 데이터 관리 안내 섹션 */}
+      <Divider sx={{ my: 4, borderStyle: 'dotted', borderWidth: '2px' }} />
+      <Paper sx={{ p: 4, mt: 4, mb: 8, bgcolor: 'background.paper', borderRadius: 3, boxShadow: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <InfoIcon color="primary" sx={{ fontSize: 32, mr: 1 }} />
+          <Typography variant="h5" fontWeight="bold">데이터 관리 안내</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4 }}>
+          {/* 좌측: 내보내기 파일명 안내 */}
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 2 }}>
+              내보내기 파일명 안내
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
+              <FolderZipIcon color="action" />
+              <Typography variant="body1" fontWeight="bold">사진 데이터(원본)</Typography>
+              <Typography variant="body2" color="text.secondary">photos_original_yyyymmdd.zip</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
+              <InsertDriveFileIcon color="action" />
+              <Typography variant="body1" fontWeight="bold">사진 DB 데이터</Typography>
+              <Typography variant="body2" color="text.secondary">photos_db_yyyymmdd.json</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <InsertDriveFileIcon color="action" />
+              <Typography variant="body1" fontWeight="bold">카테고리 데이터</Typography>
+              <Typography variant="body2" color="text.secondary">categories_yyyymmdd.json</Typography>
+            </Box>
+          </Box>
+          {/* 우측: 가져오기 순서 안내 */}
+          <Box sx={{ flex: 1, borderLeft: { md: '1.5px dotted #bbb' }, pl: { md: 4 }, mt: { xs: 4, md: 0 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <WarningAmberIcon color="warning" sx={{ mr: 1 }} />
+              <Typography variant="subtitle1" fontWeight="bold" color="warning.main">
+                가져오기 순서 안내
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, ml: 4 }}>
+              <b>성공 메시지 창이 보일 때까지 잠시 기다려 주세요.</b>
+            </Typography>
+            <Box sx={{ ml: 4 }}>
+              <Typography variant="body1" sx={{ mb: 1 }}>
+                1. <b>카테고리 데이터</b> (<span style={{ color: '#1976d2' }}>categories_yyyymmdd.json</span>)
+              </Typography>
+              <Typography variant="body1" sx={{ mb: 1 }}>
+                2. <b>사진 DB 데이터</b> (<span style={{ color: '#1976d2' }}>photos_db_yyyymmdd.json</span>)
+              </Typography>
+              <Typography variant="body1">
+                3. <b>사진 데이터(원본)</b> (<span style={{ color: '#1976d2' }}>photos_original_yyyymmdd.zip</span>)
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      </Paper>
     </Container>
   );
 } 
