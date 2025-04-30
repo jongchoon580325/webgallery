@@ -11,6 +11,8 @@ import {
   getAllCategories,
   getThumbnailByPhotoId,
 } from '@/db/utils';
+import OptimizedImage from '@/components/common/OptimizedImage';
+import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 
 const sampleCategories = [
   { id: 0, name: '전체' },
@@ -40,6 +42,7 @@ export default function GalleryPage() {
   const [modalRipple, setModalRipple] = useState<{ x: number; y: number } | null>(null);
   const [photos, setPhotos] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([{ id: 0, name: '전체' }]);
+  const [selectedPhoto, setSelectedPhoto] = useState<any | null>(null);
 
   // DB에서 사진/카테고리 fetch
   useEffect(() => {
@@ -105,6 +108,47 @@ export default function GalleryPage() {
     }
   }, [modalRipple]);
 
+  const handleModalClose = () => {
+    setSelectedPhoto(null);
+  };
+
+  // 이전/다음 이미지 이동 핸들러
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentIndex = photos.findIndex(photo => photo.id === selectedPhoto.id);
+    const prevIndex = (currentIndex - 1 + photos.length) % photos.length;
+    setSelectedPhoto(photos[prevIndex]);
+  };
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentIndex = photos.findIndex(photo => photo.id === selectedPhoto.id);
+    const nextIndex = (currentIndex + 1) % photos.length;
+    setSelectedPhoto(photos[nextIndex]);
+  };
+
+  // 키보드 네비게이션 추가
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedPhoto) return;
+      
+      if (e.key === 'ArrowLeft') {
+        const currentIndex = photos.findIndex(photo => photo.id === selectedPhoto.id);
+        const prevIndex = (currentIndex - 1 + photos.length) % photos.length;
+        setSelectedPhoto(photos[prevIndex]);
+      } else if (e.key === 'ArrowRight') {
+        const currentIndex = photos.findIndex(photo => photo.id === selectedPhoto.id);
+        const nextIndex = (currentIndex + 1) % photos.length;
+        setSelectedPhoto(photos[nextIndex]);
+      } else if (e.key === 'Escape') {
+        setSelectedPhoto(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPhoto, photos]);
+
   return (
     <Container maxWidth="lg">
       <Box sx={{ my: 4 }}>
@@ -141,7 +185,7 @@ export default function GalleryPage() {
           <Grid item xs={1} sm={1} md={1} key={photo.id}>
             <Card
               sx={{ borderRadius: 2, overflow: 'hidden', height: '100%', position: 'relative', cursor: 'pointer' }}
-              onClick={() => setExpandedIdx(idx)}
+              onClick={() => setSelectedPhoto(photo)}
               onMouseMove={e => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 setRipple({
@@ -151,19 +195,13 @@ export default function GalleryPage() {
                 });
               }}
             >
-              {photo.thumbnailPath || photo.url ? (
-                <CardMedia
-                  component="img"
-                  height="140"
-                  image={photo.thumbnailPath || photo.url || ''}
-                  alt="gallery"
-                  sx={{ objectFit: 'cover', aspectRatio: '4/3', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.03)' } }}
-                />
-              ) : (
-                <Box sx={{ width: '100%', height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'grey.100', color: 'grey.400' }}>
-                  이미지 없음
-                </Box>
-              )}
+              <OptimizedImage
+                src={photo.thumbnailPath || photo.url || ''}
+                alt={`Photo taken at ${photo.location}`}
+                className="w-full h-64 object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105"
+                width={400}
+                height={256}
+              />
               {/* Ripple 효과 */}
               {ripple && ripple.idx === idx && (
                 <Box
@@ -230,86 +268,72 @@ export default function GalleryPage() {
         />
       </Stack>
       {/* 확장 보기 모달 */}
-      <Modal open={expandedIdx !== null} onClose={() => setExpandedIdx(null)} sx={{ zIndex: 1300 }}>
-        <Box sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          bgcolor: 'rgba(0,0,0,0.85)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          {expandedIdx !== null && (
-            <Box sx={{ position: 'relative', maxWidth: 800, width: '90vw', maxHeight: '90vh', bgcolor: 'background.paper', borderRadius: 2, boxShadow: 6, p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <IconButton onClick={() => setExpandedIdx(null)} sx={{ position: 'absolute', top: 8, right: 8, color: '#fff', zIndex: 2 }}>
-                <CloseIcon fontSize="large" />
-              </IconButton>
-              <img
-                src={paged[expandedIdx].thumbnailPath || paged[expandedIdx].url || ''}
-                alt="expanded"
+      {selectedPhoto && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 overflow-y-auto" onClick={handleModalClose}>
+          <div className="relative min-h-screen w-full flex items-center justify-center py-8" onClick={(e) => e.stopPropagation()}>
+            <div className="relative max-w-7xl mx-auto px-4">
+              {/* 닫기 버튼 */}
+              <button
+                className="fixed top-4 right-4 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200 transform hover:scale-110 z-50"
+                onClick={handleModalClose}
                 style={{
-                  width: '100%',
-                  height: 'auto',
-                  maxWidth: 800,
-                  maxHeight: '70vh',
-                  borderRadius: 8,
-                  marginBottom: 16,
-                  cursor: 'pointer',
-                  position: 'relative',
-                  display: 'block',
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.12)'
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
                 }}
-                onMouseMove={e => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setModalRipple({
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top,
-                  });
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+
+              {/* 이전 버튼 */}
+              <button
+                className="fixed left-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200 transform hover:scale-110 z-50"
+                onClick={handlePrevImage}
+                style={{
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
                 }}
-              />
-              {/* 모달 ripple 효과 */}
-              {modalRipple && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    left: modalRipple.x - 120,
-                    top: modalRipple.y - 120,
-                    width: 240,
-                    height: 240,
-                    borderRadius: '50%',
-                    background: 'rgba(0,0,0,0.15)',
-                    transform: 'scale(0)',
-                    animation: 'ripple-wave-modal 0.6s cubic-bezier(0.4,0,0.2,1) forwards',
-                    pointerEvents: 'none',
-                    zIndex: 10,
-                  }}
+              >
+                <ChevronLeftIcon className="h-8 w-8" />
+              </button>
+
+              {/* 다음 버튼 */}
+              <button
+                className="fixed right-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200 transform hover:scale-110 z-50"
+                onClick={handleNextImage}
+                style={{
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                <ChevronRightIcon className="h-8 w-8" />
+              </button>
+
+              {/* 이미지 컨테이너 */}
+              <div className="relative">
+                <OptimizedImage
+                  src={selectedPhoto.originalPath}
+                  alt={`Photo taken at ${selectedPhoto.location}`}
+                  className="w-auto max-h-[85vh] mx-auto rounded-lg shadow-2xl"
+                  priority={true}
                 />
-              )}
-              <style>{`
-                @keyframes ripple-wave-modal {
-                  to {
-                    transform: scale(2.5);
-                    opacity: 0;
-                  }
-                }
-              `}</style>
-              {/* 내비게이션 버튼 스타일 개선 */}
-              <IconButton onClick={handlePrev} sx={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#fff', background: 'rgba(0,0,0,0.25)', opacity: 1, zIndex: 2, '&:hover': { background: 'rgba(0,0,0,0.4)' } }}>
-                <ArrowBackIosNewIcon fontSize="large" />
-              </IconButton>
-              <IconButton onClick={handleNext} sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#fff', background: 'rgba(0,0,0,0.25)', opacity: 1, zIndex: 2, '&:hover': { background: 'rgba(0,0,0,0.4)' } }}>
-                <ArrowForwardIosIcon fontSize="large" />
-              </IconButton>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-                {paged[expandedIdx].date} | {paged[expandedIdx].location}
-              </Typography>
-            </Box>
-          )}
-        </Box>
-      </Modal>
+                
+                {/* 이미지 정보 */}
+                <div className="absolute bottom-4 left-4 text-white bg-black bg-opacity-50 p-3 rounded-lg backdrop-blur-sm">
+                  <p className="text-lg font-semibold">{selectedPhoto.location}</p>
+                  <p className="text-sm">{new Date(selectedPhoto.date).toLocaleDateString()}</p>
+                  <p className="text-sm">Photo by: {selectedPhoto.photographer}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <ScrollToTopButton />
     </Container>
   );

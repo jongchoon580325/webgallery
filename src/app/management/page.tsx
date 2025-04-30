@@ -17,6 +17,9 @@ import {
   addThumbnail as dbAddThumbnail,
   restoreDefaultCategories
 } from '@/db/utils';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import { optimizeImageThumbnail, optimizeOriginalImage } from '@/utils/imageOptimizer';
 
 // 기본 카테고리 상수로 정의
 const defaultCategories = [
@@ -33,60 +36,6 @@ const defaultCategories = [
 interface Category {
   id: number;
   name: string;
-}
-
-// 이미지 리사이즈(썸네일 생성) 함수
-function resizeImage(file: File, maxWidth = 200): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new window.Image();
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      img.onload = () => {
-        const scale = maxWidth / img.width;
-        const canvas = document.createElement('canvas');
-        canvas.width = maxWidth;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-// 원본 이미지 리사이즈(압축) 함수
-function resizeOriginalImage(file: File, maxWidth = 1920, quality = 0.8): Promise<string> {
-  return new Promise((resolve) => {
-    if (file.size <= 2 * 1024 * 1024) { // 2MB 이하면 원본 유지
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result as string);
-      reader.readAsDataURL(file);
-      return;
-    }
-    const img = new window.Image();
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      img.onload = () => {
-        let targetWidth = img.width;
-        let targetHeight = img.height;
-        if (img.width > maxWidth) {
-          const scale = maxWidth / img.width;
-          targetWidth = maxWidth;
-          targetHeight = img.height * scale;
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
 }
 
 // 이미지 데이터 URL의 크기를 MB 단위로 계산하는 함수
@@ -140,13 +89,15 @@ export default function ManagementPage() {
     try {
       let totalSize = 0;
       for (const file of form.files.slice(0, 10)) {
-        // 원본 이미지 리사이즈/압축
-        const originalBase64 = await resizeOriginalImage(file, 1920, 0.8);
+        // 원본 이미지 최적화
+        const originalBase64 = await optimizeOriginalImage(file);
         // 썸네일 생성
-        const thumbnailBase64 = await resizeImage(file, 200);
+        const thumbnailBase64 = await optimizeImageThumbnail(file);
         
         // 변환된 이미지 크기 계산
-        totalSize += calculateImageSize(originalBase64);
+        const base64Length = originalBase64.split(',')[1].length;
+        const sizeInBytes = (base64Length * 3) / 4;
+        totalSize += Number((sizeInBytes / (1024 * 1024)).toFixed(2));
         
         // 원본 사진 저장
         const photo = {
@@ -163,6 +114,7 @@ export default function ManagementPage() {
         // 썸네일 별도 저장
         await dbAddThumbnail({ photoId, data: thumbnailBase64 });
       }
+      
       setForm({ date: '', location: '', photographer: '', categoryId: '', files: [] });
       
       // 성공 모달 표시 (저장된 크기 정보 포함)
@@ -383,6 +335,101 @@ export default function ManagementPage() {
                 </ListItem>
               ))}
             </List>
+          </Paper>
+        </Grid>
+      </Grid>
+      <Divider sx={{ my: 4, borderStyle: 'dotted', borderWidth: '1px' }} />
+      
+      {/* 데이터 관리 섹션 */}
+      <Grid container spacing={4}>
+        {/* 사진 데이터 관리 섹션 */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h5" gutterBottom>사진 데이터 관리</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* 사진 데이터(원본) 관리 */}
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
+                  사진 데이터 (원본)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<FileDownloadIcon />}
+                    sx={{ flex: 1 }}
+                  >
+                    내보내기
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<FileUploadIcon />}
+                    sx={{ flex: 1 }}
+                  >
+                    가져오기
+                  </Button>
+                </Box>
+              </Box>
+              
+              {/* 사진 DB 데이터 관리 */}
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
+                  사진 DB 데이터
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<FileDownloadIcon />}
+                    sx={{ flex: 1 }}
+                  >
+                    내보내기
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<FileUploadIcon />}
+                    sx={{ flex: 1 }}
+                  >
+                    가져오기
+                  </Button>
+                </Box>
+              </Box>
+            </Box>
+          </Paper>
+        </Grid>
+        
+        {/* 카테고리 데이터 관리 섹션 */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h5" gutterBottom>카테고리 데이터 관리</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* 카테고리 데이터 관리 */}
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
+                  카테고리 데이터
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<FileDownloadIcon />}
+                    sx={{ flex: 1 }}
+                  >
+                    내보내기
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<FileUploadIcon />}
+                    sx={{ flex: 1 }}
+                  >
+                    가져오기
+                  </Button>
+                </Box>
+              </Box>
+            </Box>
           </Paper>
         </Grid>
       </Grid>
