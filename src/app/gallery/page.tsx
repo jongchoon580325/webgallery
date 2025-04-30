@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Container, Typography, Box, Divider, Grid, Card, CardContent, CardMedia, Select, MenuItem, FormControl, InputLabel, Pagination, Stack, Modal, IconButton } from '@mui/material';
+import { Container, Typography, Box, Divider, Grid, Card, CardContent, CardMedia, Select, MenuItem, FormControl, InputLabel, Pagination, Stack, Modal, IconButton, TextField } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
@@ -36,6 +36,8 @@ const PHOTOS_PER_PAGE = 20;
 
 export default function GalleryPage() {
   const [category, setCategory] = useState(0);
+  const [dateFilter, setDateFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [page, setPage] = useState(1);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [ripple, setRipple] = useState<{ idx: number; x: number; y: number } | null>(null);
@@ -43,6 +45,7 @@ export default function GalleryPage() {
   const [photos, setPhotos] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([{ id: 0, name: '전체' }]);
   const [selectedPhoto, setSelectedPhoto] = useState<any | null>(null);
+  const [locations, setLocations] = useState<string[]>([]);
 
   // DB에서 사진/카테고리 fetch
   useEffect(() => {
@@ -58,6 +61,10 @@ export default function GalleryPage() {
         })
       );
       setPhotos(photosWithThumb);
+      
+      // 위치 목록 추출
+      const uniqueLocations = Array.from(new Set(photosWithThumb.map(p => p.location).filter(Boolean)));
+      setLocations(uniqueLocations.sort());
     }
     fetchPhotosWithThumbnails();
 
@@ -66,9 +73,30 @@ export default function GalleryPage() {
     );
   }, []);
 
-  const filtered = category === 0 ? photos : photos.filter(p => p.categoryId === category);
+  // 필터링 로직
+  const filtered = photos.filter(photo => {
+    // 카테고리 필터
+    if (category !== 0 && photo.categoryId !== category) return false;
+    
+    // 날짜 필터
+    if (dateFilter && photo.date && !photo.date.includes(dateFilter)) return false;
+    
+    // 위치 필터
+    if (locationFilter && photo.location !== locationFilter) return false;
+    
+    return true;
+  });
+
   const paged = filtered.slice((page - 1) * PHOTOS_PER_PAGE, page * PHOTOS_PER_PAGE);
   const pageCount = Math.ceil(filtered.length / PHOTOS_PER_PAGE);
+
+  // 필터 초기화 함수
+  const resetFilters = () => {
+    setCategory(0);
+    setDateFilter('');
+    setLocationFilter('');
+    setPage(1);
+  };
 
   // 확장 보기 모달 내비게이션
   const handlePrev = useCallback(() => {
@@ -165,21 +193,85 @@ export default function GalleryPage() {
         </Typography>
         <Divider sx={{ my: 2 }} />
       </Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="subtitle1">카테고리별로 사진을 필터링할 수 있습니다.</Typography>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>카테고리</InputLabel>
-          <Select
-            value={category}
-            label="카테고리"
-            onChange={e => { setCategory(Number(e.target.value)); setPage(1); setExpandedIdx(null); }}
-          >
-            {categories.map(cat => (
-              <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+
+      {/* 필터 섹션 */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="subtitle1" gutterBottom>필터</Typography>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={4}>
+            <FormControl fullWidth size="small">
+              <InputLabel>카테고리</InputLabel>
+              <Select
+                value={category}
+                label="카테고리"
+                onChange={e => { setCategory(Number(e.target.value)); setPage(1); setExpandedIdx(null); }}
+              >
+                {categories.map(cat => (
+                  <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          
+          <Grid item xs={12} sm={4}>
+            <TextField
+              fullWidth
+              size="small"
+              type="date"
+              label="날짜"
+              value={dateFilter}
+              onChange={e => { setDateFilter(e.target.value); setPage(1); setExpandedIdx(null); }}
+              InputLabelProps={{ 
+                shrink: true,
+                sx: {
+                  color: theme => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'inherit'
+                }
+              }}
+              sx={{
+                '& .MuiInputBase-root': {
+                  '& .MuiInputBase-input[type="date"]::-webkit-calendar-picker-indicator': {
+                    filter: theme => theme.palette.mode === 'dark' ? 'invert(1)' : 'none'
+                  }
+                }
+              }}
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={4}>
+            <FormControl fullWidth size="small">
+              <InputLabel>위치</InputLabel>
+              <Select
+                value={locationFilter}
+                label="위치"
+                onChange={e => { setLocationFilter(e.target.value); setPage(1); setExpandedIdx(null); }}
+              >
+                <MenuItem value="">전체</MenuItem>
+                {locations.map(location => (
+                  <MenuItem key={location} value={location}>{location}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
+
+        {/* 필터 결과 및 초기화 버튼 */}
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            {filtered.length}개의 사진이 검색되었습니다
+          </Typography>
+          {(category !== 0 || dateFilter || locationFilter) && (
+            <Typography
+              variant="body2"
+              color="primary"
+              sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+              onClick={resetFilters}
+            >
+              필터 초기화
+            </Typography>
+          )}
+        </Box>
       </Box>
+
       <Grid container spacing={2} columns={{ xs: 2, sm: 4, md: 5 }}>
         {paged.map((photo, idx) => (
           <Grid item xs={1} sm={1} md={1} key={photo.id}>
