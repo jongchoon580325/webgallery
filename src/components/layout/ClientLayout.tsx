@@ -12,7 +12,18 @@ interface ClientLayoutProps {
 }
 
 const ClientLayout: React.FC<ClientLayoutProps> = ({ children }) => {
-  const [darkMode, setDarkMode] = React.useState(false);
+  // 시스템의 다크모드 설정을 확인
+  const prefersDarkMode = typeof window !== 'undefined' 
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches 
+    : true;
+
+  // 다크모드를 기본값으로 설정
+  const [darkMode, setDarkMode] = React.useState(true);
+
+  // 컴포넌트 마운트 시 시스템 설정 반영
+  React.useEffect(() => {
+    setDarkMode(true);
+  }, []);
 
   const theme = React.useMemo(
     () =>
