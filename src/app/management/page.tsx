@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Container, Typography, Box, Divider, Grid, TextField, Button, MenuItem, Paper, List, ListItem, ListItemText, IconButton } from '@mui/material';
+import { Container, Typography, Box, Divider, Grid, TextField, Button, MenuItem, Paper, List, ListItem, ListItemText, IconButton, LinearProgress } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -19,7 +19,9 @@ import {
   exportPhotosData,
   importPhotosData,
   exportCategoriesData,
-  importCategoriesData
+  importCategoriesData,
+  exportOriginalPhotos,
+  importOriginalPhotos
 } from '@/db/utils';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
@@ -72,6 +74,10 @@ export default function ManagementPage() {
   // 파일 입력을 위한 ref 추가
   const photoDataFileRef = useRef<HTMLInputElement>(null);
   const categoryDataFileRef = useRef<HTMLInputElement>(null);
+
+  // 진행률 상태 추가
+  const [progress, setProgress] = useState<number | null>(null);
+  const originalPhotosFileRef = useRef<HTMLInputElement>(null);
 
   // DB 연동: 카테고리 fetch
   const fetchCategories = async () => {
@@ -245,6 +251,57 @@ export default function ManagementPage() {
     }
   };
 
+  // 원본 사진 데이터 내보내기 핸들러
+  const handleExportOriginalPhotos = async () => {
+    try {
+      setProgress(0);
+      await exportOriginalPhotos((progress) => {
+        setProgress(progress);
+      });
+      setSuccessModal({
+        open: true,
+        message: '원본 사진 데이터를 성공적으로 내보냈습니다.'
+      });
+    } catch (error) {
+      console.error('원본 사진 데이터 내보내기 실패:', error);
+      setSuccessModal({
+        open: true,
+        message: '원본 사진 데이터 내보내기에 실패했습니다.'
+      });
+    } finally {
+      setProgress(null);
+    }
+  };
+
+  // 원본 사진 데이터 가져오기 핸들러
+  const handleImportOriginalPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setProgress(0);
+      await importOriginalPhotos(file, (progress) => {
+        setProgress(progress);
+      });
+      setSuccessModal({
+        open: true,
+        message: '원본 사진 데이터를 성공적으로 가져왔습니다.'
+      });
+      // 파일 입력 초기화
+      if (originalPhotosFileRef.current) {
+        originalPhotosFileRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('원본 사진 데이터 가져오기 실패:', error);
+      setSuccessModal({
+        open: true,
+        message: '원본 사진 데이터 가져오기에 실패했습니다.'
+      });
+    } finally {
+      setProgress(null);
+    }
+  };
+
   return (
     <Container maxWidth="lg">
       <Box sx={{ my: 4 }}>
@@ -412,6 +469,48 @@ export default function ManagementPage() {
           <Paper sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>사진 데이터 관리</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* 원본 사진 데이터 관리 */}
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
+                  사진 데이터 (원본)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<FileDownloadIcon />}
+                    onClick={handleExportOriginalPhotos}
+                    sx={{ flex: 1 }}
+                  >
+                    내보내기
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".zip"
+                    style={{ display: 'none' }}
+                    ref={originalPhotosFileRef}
+                    onChange={handleImportOriginalPhotos}
+                  />
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<FileUploadIcon />}
+                    onClick={() => originalPhotosFileRef.current?.click()}
+                    sx={{ flex: 1 }}
+                  >
+                    가져오기
+                  </Button>
+                </Box>
+                {progress !== null && (
+                  <Box sx={{ width: '100%', mt: 2 }}>
+                    <LinearProgress variant="determinate" value={progress} />
+                    <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 1 }}>
+                      {Math.round(progress)}%
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
               {/* 사진 DB 데이터 관리 */}
               <Box>
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
