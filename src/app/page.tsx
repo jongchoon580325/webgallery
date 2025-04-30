@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import HeroSection from '@/components/home/HeroSection';
 import FeatureCard from '@/components/home/FeatureCard';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import Link from 'next/link';
 
 export default function HomePage() {
   const [scrollY, setScrollY] = useState(0);
@@ -77,34 +78,30 @@ export default function HomePage() {
           ))}
         </Grid>
 
-        <Box sx={{ mt: 12, textAlign: 'center' }}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            viewport={{ once: true }}
-          >
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
+          <Link href="/gallery" passHref>
             <Button
               variant="contained"
               size="large"
-              href="/gallery"
+              className="firework-button"
               sx={{
-                px: 6,
-                py: 2,
                 fontSize: '1.2rem',
+                py: 2,
+                px: 6,
                 borderRadius: '50px',
                 background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
                 boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+                color: 'white',
                 '&:hover': {
-                  background: 'linear-gradient(45deg, #1976D2 30%, #0CA8E8 90%)',
+                  background: 'linear-gradient(45deg, #21CBF3 30%, #2196F3 90%)',
                   transform: 'translateY(-2px)',
-                  transition: 'all 0.3s ease-in-out',
-                }
+                  transition: 'all 0.3s ease',
+                },
               }}
             >
               갤러리 둘러보기
             </Button>
-          </motion.div>
+          </Link>
         </Box>
       </Container>
     </Box>
